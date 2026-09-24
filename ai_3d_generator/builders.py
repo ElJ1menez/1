@@ -84,10 +84,7 @@ def build_generated(context, r):
     mesh.materials.append(vertex_color_material())
     obj = bpy.data.objects.new(name, mesh)
     collection(context).objects.link(obj)
-    for poly_obj in context.view_layer.objects:
-        poly_obj.select_set(False)
-    obj.select_set(True)
-    context.view_layer.objects.active = obj
+    select_only(context, [obj])
     obj.location = context.scene.cursor.location
     set_provenance(obj, r["provenance"])
     obj["ai3d_input_image"] = r["image"]
@@ -95,8 +92,14 @@ def build_generated(context, r):
 
 
 def select_only(context, objs, active=None):
-    for o in context.view_layer.objects:
-        o.select_set(False)
+    # Iterate bpy.data, not view_layer.objects: right after an object is
+    # removed, the view layer's cached list can hold stale entries (None in
+    # Blender 5.2, a crash in 4.2) until it is resynced.
+    for o in bpy.data.objects:
+        try:
+            o.select_set(False)
+        except RuntimeError:  # not in this view layer
+            pass
     for o in objs:
         o.hide_set(False)
         o.select_set(True)

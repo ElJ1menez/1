@@ -406,9 +406,13 @@ def optimize_steps(context, obj, s, device="CPU", job=None):
     try:
         return (yield from _optimize(context, obj, s, device, job))
     except Exception:
+        try:
+            current = obj.name
+        except ReferenceError:  # original already replaced: keep the result
+            raise
         for extra in set(bpy.data.objects) - before:
             bpy.data.objects.remove(extra)
-        if obj.name != name:
+        if current != name:
             obj.name = name
         raise
 

@@ -71,7 +71,8 @@ def _drive(context, key, obj=None, timeout=300):
         time.sleep(0.05)
 
 
-def test_generate_optimize_export(addon, tmp_path, monkeypatch):
+@pytest.mark.parametrize("keep_source", [True, False])
+def test_generate_optimize_export(addon, tmp_path, monkeypatch, keep_source):
     api, deps = addon
     from ai_3d_generator.core import engines
     monkeypatch.setattr(engines, "triposr", _fake_triposr)
@@ -96,7 +97,7 @@ def test_generate_optimize_export(addon, tmp_path, monkeypatch):
 
     api._apply_settings(dict(source="IMAGE", image_path=str(path), name="Jarron",
                              mc_resolution=96, real_size=0.4, target_faces=2000,
-                             texture_size="512", lods=1, keep_source=True,
+                             texture_size="512", lods=1, keep_source=keep_source,
                              export_dir=str(tmp_path / "export")))
     level, text = _drive(context, "generate")
     assert level == "INFO", text
@@ -113,7 +114,7 @@ def test_generate_optimize_export(addon, tmp_path, monkeypatch):
     lo = min((obj.matrix_world @ v.co).z for v in obj.data.vertices)
     assert abs(lo - obj.location.z) < 1e-4  # origin on the ground
     assert bpy.data.objects.get("Jarron_LOD1") is not None
-    assert bpy.data.objects.get("Jarron_original") is not None  # keep_source
+    assert (bpy.data.objects.get("Jarron_original") is not None) == keep_source
 
     # The baked base colour reproduces the AI vertex colours (red top, blue bottom).
     base = bpy.data.images["Jarron_BaseColor"]
@@ -136,6 +137,8 @@ def test_generate_optimize_export(addon, tmp_path, monkeypatch):
     stages = [s["stage"] for s in sheet["generation"]["steps"]]
     assert stages[0] == "input_image" and "image_to_3d" in stages
     assert ("background_removal" in stages) == bool(isnet)
+    for o in [o for o in bpy.data.objects if o.name.startswith("Jarron")]:
+        bpy.data.objects.remove(o)
 
 
 def test_optimize_any_mesh_quads_without_bake(addon):
@@ -184,3 +187,27 @@ def test_api_surface(addon):
     lic = api.licenses()
     assert lic["triposr"]["license"] == "MIT" and lic["t2i_FLUX_SCHNELL"]["license"] == "Apache-2.0"
     assert "ai3d.generate" in api.help() or "generate(" in api.help()
+
+
+def test_generate_samples_script_with_images(addon, tmp_path, monkeypatch):
+    api, deps = addon
+    from ai_3d_generator.core import engines
+    monkeypatch.setattr(engines, "triposr", _fake_triposr)
+    monkeypatch.setitem(deps.paths, "outputs", str(tmp_path / "outputs"))
+    monkeypatch.setitem(sys.modules, "ai_3d_generator_api", api)
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    import generate_samples
+    from PIL import Image
+    images = tmp_path / "fotos"
+    images.mkdir()
+    for name, color in (("vaso", (30, 90, 200)), ("pera", (120, 180, 40))):
+        img = np.zeros((128, 128, 4), np.uint8)
+        img[20:110, 40:90] = (*color, 255)
+        Image.fromarray(img).save(images / (name + ".png"))
+    out = tmp_path / "muestras"
+    summary = generate_samples.main(["--out", str(out), "--images", str(images), "--faces", "1500",
+                                     "--texture", "512", "--formats", "glb"])
+    assert [e["status"] for e in summary] == ["INFO", "INFO"], summary
+    for name in ("vaso", "pera"):
+        assert (out / (name + ".glb")).is_file() and (out / (name + "_licencias.json")).is_file()
+    assert (out / "muestras.png").is_file() and (out / "resumen.json").is_file()

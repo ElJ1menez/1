@@ -89,6 +89,26 @@ origen, cada LOD en su propio archivo, y con *Ficha de licencias* se escribe
 `<nombre>_licencias.json` con los modelos de IA usados, sus licencias, prompt, semilla,
 fecha e informe de calidad: tu prueba de procedencia si un cliente o una tienda la pide.
 
+## Generar un lote de modelos de prueba
+
+`scripts/generate_samples.py` genera varios modelos seguidos sin abrir la interfaz y
+exporta cada uno a GLB con su ficha de licencias. Al final deja `muestras.png` (un render
+con todos los modelos en fila), `muestras.blend` y `resumen.json` (tiempos, triángulos,
+medidas y errores si los hubo):
+
+```bash
+# 6 objetos de ejemplo desde texto (taza, silla, lámpara, zapatilla, cofre, maceta)
+blender -b --python scripts/generate_samples.py -- --out C:/ai3d_pruebas
+# todas las imágenes de una carpeta
+blender -b --python scripts/generate_samples.py -- --out C:/ai3d_pruebas --images C:/fotos
+# opciones: --only taza,silla  --faces 20000  --texture 2048  --model FLUX_SCHNELL
+#           --formats glb,fbx,usdz  --seed 42  --no-render
+```
+
+En Windows, `blender` es `"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"`.
+El add-on y sus dependencias tienen que estar instalados en ese Blender. La primera vez
+se descargan los modelos (TripoSR 1,7 GB y SDXL ~7 GB si usas texto).
+
 ## Controlar el add-on desde Claude (MCP)
 
 Con un servidor MCP para Blender (p. ej. **blender-mcp**) conectado a Claude en tu
