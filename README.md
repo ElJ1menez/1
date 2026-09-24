@@ -28,7 +28,7 @@ add-on; no tocan el Python de Blender.
 
 ```bash
 pip install numpy opencv-python pytest torch dm-tree einshape          # AI Motion Tracker
-pip install einops scikit-image onnxruntime pillow "bpy==4.2.0"        # AI 3D Generator (Python 3.11)
+pip install einops scikit-image onnxruntime pillow "bpy==5.2.0"        # AI 3D Generator (Python 3.13)
 python -m pytest tests -q
 ```
 Detalles de cada suite en la documentación de cada add-on.

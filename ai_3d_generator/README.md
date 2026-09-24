@@ -27,7 +27,7 @@ foto o render propio ───────────────────�
 *Izquierda: malla densa con colores por vértice (lo que da la IA). Derecha: el mismo objeto
 tras **Optimizar**: 1.500 triángulos con textura de color y mapa de normales horneados.*
 
-Compatible con **Blender 4.2 LTS → 5.x**.
+Compatible con **Blender 4.2 LTS → 5.x**; probado en **4.2 LTS y 5.2 LTS**.
 
 ## Instalación
 
@@ -166,9 +166,10 @@ ai_3d_generator/
 └── third_party/triposr/   # TripoSR (MIT) adaptado: sin omegaconf/transformers/torchmcubes
 ```
 
-Tests (el de Blender usa el módulo `bpy` de PyPI, que requiere Python 3.11):
+Tests (el de Blender usa el módulo `bpy` de PyPI: `bpy==5.2.0` con Python 3.13, o
+`bpy==4.2.0` con Python 3.11):
 ```bash
-pip install numpy torch einops scikit-image onnxruntime pillow pytest bpy==4.2.0
+pip install numpy torch einops scikit-image onnxruntime pillow pytest bpy==5.2.0
 pip install "transformers<5"   # opcional: compara el ViT con el de transformers
 python -m pytest tests/test_ai3d_core.py tests/test_ai3d_blender.py -q
 # con el quitafondos real:

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """AI 3D Generator inside Blender (headless), using the `bpy` module from PyPI
-(pip install bpy==4.2.0 on Python 3.11). The generation pipeline runs for
+(pip install bpy==5.2.0 on Python 3.13, or bpy==4.2.0 on 3.11). The generation pipeline runs for
 real except TripoSR's weights: the model is built with the real architecture
 but its density field is replaced by a known shape, since the checkpoint is a
 1.7 GB download. Set AI3D_ISNET=/path/isnet-general-use.onnx to also run the
@@ -129,7 +129,8 @@ def test_generate_optimize_export(addon, tmp_path, monkeypatch):
     names = sorted(os.path.basename(f) for f in out["files"])
     assert "Jarron.glb" in names and "Jarron_LOD1.glb" in names and "Jarron_licencias.json" in names
     assert os.path.getsize(tmp_path / "export" / "Jarron.glb") > 50000  # textures embedded
-    sheet = json.load(open(tmp_path / "export" / "Jarron_licencias.json", encoding="utf-8"))
+    with open(tmp_path / "export" / "Jarron_licencias.json", encoding="utf-8") as f:
+        sheet = json.load(f)
     assert "MIT" in sheet["licenses"]
     assert sheet["report"]["watertight"] is True
     stages = [s["stage"] for s in sheet["generation"]["steps"]]

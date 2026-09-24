@@ -128,7 +128,7 @@ def mesh_report(obj, max_topology_check=400000):
         bm.free()
     lo, hi = world_bbox(obj)
     mats = [m for m in obj.data.materials if m]
-    images = sorted({n.image.name for m in mats if m.use_nodes for n in m.node_tree.nodes
+    images = sorted({n.image.name for m in mats if m.node_tree for n in m.node_tree.nodes
                      if n.type == "TEX_IMAGE" and n.image})
     return {
         "object": obj.name,
@@ -264,8 +264,7 @@ def _save_image(img, folder):
 
 
 def pbr_material(name, base_img=None, normal_img=None, roughness=0.6, metallic=0.0):
-    mat = bpy.data.materials.get(name) or bpy.data.materials.new(name)
-    mat.use_nodes = True
+    mat = bpy.data.materials.get(name) or builders.new_node_material(name)
     nodes, links = mat.node_tree.nodes, mat.node_tree.links
     nodes.clear()
     out = nodes.new("ShaderNodeOutputMaterial")

@@ -42,12 +42,20 @@ def mesh_from_arrays(name, verts, faces, colors=None):
     return mesh
 
 
+def new_node_material(name):
+    """New material with a node tree (always the case from Blender 5.0, where
+    Material.use_nodes is deprecated)."""
+    mat = bpy.data.materials.new(name)
+    if bpy.app.version < (5, 0, 0):
+        mat.use_nodes = True
+    return mat
+
+
 def vertex_color_material(name="AI3D_VertexColor"):
     mat = bpy.data.materials.get(name)
     if mat is not None:
         return mat
-    mat = bpy.data.materials.new(name)
-    mat.use_nodes = True
+    mat = new_node_material(name)
     nodes, links = mat.node_tree.nodes, mat.node_tree.links
     bsdf = nodes.get("Principled BSDF")
     attr = nodes.new("ShaderNodeVertexColor")
