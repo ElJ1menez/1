@@ -23,7 +23,7 @@ class AIMT_OT_install_deps(jobs.JobOperator, bpy.types.Operator):
             "numpy": numpy.__version__,
         }
         return self.launch(context, "Instalando " + deps.GROUPS[self.group]["label"],
-                           deps.install_worker, params)
+                           deps.install_worker, params, self.finish)
 
     def finish(self, context, result):
         if deps.available(result["group"]):

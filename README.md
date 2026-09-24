@@ -16,7 +16,7 @@ Compatible con **Blender 4.2 LTS → 5.x** (probado en 4.2, 4.5 y 5.0; pensado p
 
 1. Genera el zip (o descárgalo de las releases):
    ```bash
-   python scripts/build_extension.py      # crea dist/ai_motion_tracker-1.0.0.zip
+   python scripts/build_extension.py      # crea dist/ai_motion_tracker-1.1.0.zip
    ```
 2. En Blender: **Edit › Preferences › Get Extensions › ▾ (arriba a la derecha) › Install from Disk…**
    y elige el zip.
@@ -76,6 +76,38 @@ En *Cuerpo y cara*:
   animadas (`jawOpen`, `eyeBlinkLeft`…). Úsalas como drivers de shape keys.
   Para ver la cabeza alineada con el video, pon la resolución de la escena igual a la del clip.
 
+## Controlar el add-on desde Claude (MCP)
+
+Si tienes un servidor MCP para Blender (por ejemplo **blender-mcp**, o la extensión MCP
+que escucha en `localhost:9876`) conectado a Claude Desktop o a Claude Code **en tu
+ordenador**, Claude puede manejar el add-on desde el chat. Usa la herramienta del
+servidor que ejecuta código Python dentro de Blender con esta API:
+
+```python
+import ai_motion_tracker_api as aimt
+print(aimt.help())                                   # guía rápida para el asistente
+print(aimt.load_clip(r"C:/shots/plano_01.mp4"))
+print(aimt.run("camera_track", auto_focal=True, setup_scene=True))
+print(aimt.status())                                 # repetir hasta running == False
+print(aimt.solve_info())                             # error, focal, frames resueltos
+```
+
+| Función | Qué hace |
+|---|---|
+| `status()` | Dependencias, clip activo, progreso de la tarea y último resultado (con log si hubo error) |
+| `load_clip(ruta)` | Carga un video o secuencia y lo pone en el Clip Editor |
+| `settings()` | Todos los ajustes con valor, descripción, límites u opciones |
+| `run(tool, clip=None, **ajustes)` | `camera_track`, `track_selected`, `solve`, `pose` o `face`; devuelve al instante |
+| `cancel()` · `wait_hint()` · `solve_info()` | Cancelar, cuánto esperar entre consultas, calidad del solve |
+
+La IA trabaja en segundo plano mediante temporizadores de Blender, así que las llamadas no
+bloquean el servidor MCP ni la interfaz. Todo lo que devuelve la API se puede pasar a JSON.
+Ejemplo de petición en el chat: *"Carga C:/shots/plano_01.mp4, haz el tracking de cámara
+con focal automática y dime el error del solve"*.
+
+> El servidor MCP de Blender se conecta a `localhost`, así que tiene que ejecutarse en el
+> mismo ordenador que Blender. Una sesión de Claude en la nube no llega a él.
+
 ## Rendimiento orientativo
 
 Medido en CPU (sin GPU) sobre 40 frames 640×360: ~40 s con calidad 256 y ~140 s con 512.
@@ -109,7 +141,9 @@ Sobre un clip sintético con movimiento de cámara conocido (ground truth):
 ai_motion_tracker/
 ├── __init__.py, blender_manifest.toml
 ├── operators.py, ui.py, props.py, prefs.py   # Blender (hilo principal)
-├── jobs.py          # hilo de trabajo + operador modal (progreso, ESC)
+├── tools.py         # definición única de cada herramienta (UI y API)
+├── api.py           # API para scripts y MCP (alias ai_motion_tracker_api)
+├── jobs.py          # hilo de trabajo + operador modal o temporizador (progreso, ESC)
 ├── builders.py      # escribe tracks, keyframes, rigs
 ├── solve.py         # solve de cámara + búsqueda de focal (sección áurea)
 ├── deps.py          # pip a carpeta privada, numpy fijado al de Blender

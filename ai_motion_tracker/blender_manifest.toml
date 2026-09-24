@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "ai_motion_tracker"
-version = "1.0.0"
+version = "1.1.0"
 name = "AI Motion Tracker"
 tagline = "Motion tracking con IA open source apta para uso comercial"
 maintainer = "ElJ1menez"

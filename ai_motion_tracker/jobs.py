@@ -24,6 +24,8 @@ class Job:
         self.thread_done = False
         self.finished = False
         self.lines = []
+        self.level = None
+        self.report = None
 
     def set(self, progress=None, message=None):
         if progress is not None:
@@ -73,74 +75,120 @@ def redraw_all():
                 area.tag_redraw()
 
 
+def start(name, worker, params):
+    """Start `worker(job, params)` on a thread. Raises RuntimeError if busy."""
+    global _current
+    if busy():
+        raise RuntimeError("Ya hay un proceso de IA en marcha: %s" % _current.name)
+    job = _current = Job(name)
+    threading.Thread(target=_run, args=(job, worker, params), daemon=True).start()
+    return job
+
+
+class Driver:
+    """Main-thread state machine: wait for the thread, then run finish().
+
+    finish(context, result) returns a message, or a generator that is
+    advanced one step per tick so long main-thread work (several camera
+    solves) never freezes the UI. tick() returns None while running and
+    (level, text) once done.
+    """
+
+    def __init__(self, job, finish):
+        self.job = job
+        self.finish = finish
+        self.finisher = None
+
+    def tick(self, context):
+        job = self.job
+        if job.cancelled and not job.thread_done:
+            job.set(message="Cancelando…")
+        try:
+            if self.finisher is not None:
+                if job.cancelled:
+                    return "WARNING", "Cancelado"
+                next(self.finisher)
+                return None
+            if not job.thread_done:
+                return None
+            if job.cancelled:
+                return "WARNING", "Cancelado"
+            if job.error:
+                return "ERROR", job.error
+            job.set(progress=1.0, message="Aplicando resultados en Blender")
+            res = self.finish(context, job.result)
+            if inspect.isgenerator(res):
+                self.finisher = res
+                return None
+            return "INFO", res or "Listo"
+        except StopIteration as stop:
+            return "INFO", stop.value or "Listo"
+        except Exception as exc:
+            job.log(traceback.format_exc())
+            return "ERROR", "%s: %s" % (type(exc).__name__, exc)
+
+
+def complete(job, level, text):
+    job.finished = True
+    job.level, job.report = level, text
+    last_report["text"], last_report["level"] = text, level
+    last_log[:] = job.lines
+    if level == "ERROR" and job.lines:
+        print("[AI Motion Tracker]\n" + "\n".join(job.lines[-40:]))
+    redraw_all()
+
+
+def run_in_background(name, worker, params, finish):
+    """Like the modal operators, but driven by bpy.app.timers: needs no
+    window or event loop context, so it works from scripts and MCP calls."""
+    job = start(name, worker, params)
+    driver = Driver(job, finish)
+
+    def timer():
+        redraw_all()
+        done = driver.tick(bpy.context)
+        if done is None:
+            return 0.15
+        complete(job, *done)
+        return None
+
+    bpy.app.timers.register(timer, first_interval=0.15)
+    return job
+
+
 class JobOperator:
     """Mixin for operators that run a worker thread.
 
-    Subclasses call self.launch(context, name, worker, params) from execute()
-    and implement finish(context, result) which may return a generator to
-    spread main-thread work (e.g. several camera solves) over timer ticks.
+    Subclasses call self.launch(context, name, worker, params, finish) from
+    execute(); see Driver for what finish() may return.
     """
 
-    def launch(self, context, name, worker, params):
-        global _current
-        if busy():
-            self.report({"ERROR"}, "Ya hay un proceso de IA en marcha")
+    def launch(self, context, name, worker, params, finish):
+        try:
+            self._job = start(name, worker, params)
+        except RuntimeError as exc:
+            self.report({"ERROR"}, str(exc))
             return {"CANCELLED"}
-        self._job = _current = Job(name)
-        self._finisher = None
-        threading.Thread(target=_run, args=(self._job, worker, params), daemon=True).start()
+        self._driver = Driver(self._job, finish)
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.15, window=context.window)
         wm.modal_handler_add(self)
         return {"RUNNING_MODAL"}
 
     def modal(self, context, event):
-        job = self._job
-        if job.cancelled and not job.thread_done:
-            job.set(message="Cancelando…")
         if event.type == "ESC" and event.value == "PRESS":
-            job.cancelled = True
+            self._job.cancelled = True
         if event.type != "TIMER":
             return {"PASS_THROUGH"}
         redraw_all()
-        try:
-            if self._finisher is not None:
-                if job.cancelled:
-                    return self._end(context, "WARNING", "Cancelado")
-                next(self._finisher)
-                return {"RUNNING_MODAL"}
-            if not job.thread_done:
-                return {"RUNNING_MODAL"}
-            if job.cancelled:
-                return self._end(context, "WARNING", "Cancelado")
-            if job.error:
-                return self._end(context, "ERROR", job.error)
-            job.set(progress=1.0, message="Aplicando resultados en Blender")
-            res = self.finish(context, job.result)
-            if inspect.isgenerator(res):
-                self._finisher = res
-                return {"RUNNING_MODAL"}
-            return self._end(context, "INFO", res or "Listo")
-        except StopIteration as stop:
-            return self._end(context, "INFO", stop.value or "Listo")
-        except Exception as exc:
-            job.log(traceback.format_exc())
-            return self._end(context, "ERROR", "%s: %s" % (type(exc).__name__, exc))
-
-    def _end(self, context, level, text):
-        job = self._job
-        job.finished = True
+        done = self._driver.tick(context)
+        if done is None:
+            return {"RUNNING_MODAL"}
+        level, text = done
         context.window_manager.event_timer_remove(self._timer)
-        last_report["text"], last_report["level"] = text, level
-        last_log[:] = job.lines
-        if level == "ERROR" and job.lines:
-            print("[AI Motion Tracker]\n" + "\n".join(job.lines[-40:]))
+        complete(self._job, level, text)
         self.report({level}, text)
-        redraw_all()
         return {"FINISHED"} if level != "ERROR" else {"CANCELLED"}
-
-    def finish(self, context, result):
-        return "Listo"
 
 
 class AIMT_OT_cancel(bpy.types.Operator):
