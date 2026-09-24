@@ -1,0 +1,20 @@
+schema_version = "1.0.0"
+
+id = "ai_3d_generator"
+version = "1.0.0"
+name = "AI 3D Generator"
+tagline = "Modelos 3D con IA open source apta para uso comercial"
+maintainer = "ElJ1menez"
+type = "add-on"
+tags = ["3D View", "Mesh", "Import-Export"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+
+[permissions]
+network = "Descargar modelos de IA y librerias de Python"
+files = "Leer imagenes y exportar modelos y texturas"
+
+[build]
+paths_exclude_pattern = ["__pycache__/", "/.git/", "*.zip"]
